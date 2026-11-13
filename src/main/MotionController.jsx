@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { useDispatch } from 'react-redux';
-import { motionActions } from '../store';
+import { messagesActions, motionActions } from '../store';
 import { useAttributePreference } from '../common/util/preferences';
 import { useAsyncTask } from '../reactHelper';
 import fetchOrThrow from '../common/util/fetchOrThrow';
@@ -65,7 +65,7 @@ const MotionController = () => {
         query.append('type', 'deviceMoving');
         query.append('type', 'deviceStopped');
 
-        const response = await fetchOrThrow(`/api/reports/events?${query.toString()}`, {
+        const response = await fetchOrThrow(`api/reports/events?${query.toString()}`, {
           headers: { Accept: 'application/json' },
           signal,
         });
@@ -91,7 +91,16 @@ const MotionController = () => {
       };
 
       await refreshMotion();
-      const interval = setInterval(refreshMotion, 5 * 60 * 1000);
+      const interval = setInterval(
+        () => {
+          refreshMotion().catch((error) => {
+            if (error.name !== 'AbortError') {
+              dispatch(messagesActions.push(error.message));
+            }
+          });
+        },
+        5 * 60 * 1000,
+      );
 
       return () => {
         active = false;

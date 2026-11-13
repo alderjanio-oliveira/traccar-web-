@@ -1,14 +1,15 @@
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Tooltip from '@mui/material/Tooltip';
 
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import { map } from '../core/MapView';
 import { findFonts, geofenceToFeature, geometryToArea } from '../core/mapUtil';
-import { errorsActions, geofencesActions } from '../../store';
+import { messagesActions, geofencesActions } from '../../store';
 import { useCatchCallback } from '../../reactHelper';
 import drawTheme from './theme';
 import { useTranslation } from '../../common/components/LocalizationProvider';
@@ -23,6 +24,8 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const t = useTranslation();
+  const [hintAnchor, setHintAnchor] = useState(null);
+  const [hintDismissed, setHintDismissed] = useState(false);
 
   const draw = useMemo(
     () =>
@@ -58,7 +61,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
   const geofences = useSelector((state) => state.geofences.items);
 
   const refreshGeofences = useCatchCallback(async () => {
-    const response = await fetchOrThrow('/api/geofences');
+    const response = await fetchOrThrow('api/geofences');
     dispatch(geofencesActions.refresh(await response.json()));
   }, [dispatch]);
 
@@ -66,7 +69,16 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
     refreshGeofences();
 
     map.addControl(draw, theme.direction === 'rtl' ? 'top-right' : 'top-left');
-    return () => map.removeControl(draw);
+    setHintAnchor(map.getContainer().querySelector('.mapbox-gl-draw_polygon'));
+
+    const dismissHint = () => setHintDismissed(true);
+    map.on('draw.modechange', dismissHint);
+    map.on('draw.selectionchange', dismissHint);
+    return () => {
+      map.off('draw.modechange', dismissHint);
+      map.off('draw.selectionchange', dismissHint);
+      map.removeControl(draw);
+    };
   }, [refreshGeofences, draw, theme.direction]);
 
   useEffect(() => {
@@ -75,7 +87,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
       const newItem = { name: t('sharedGeofence'), area: geometryToArea(feature.geometry) };
       draw.delete(feature.id);
       try {
-        const response = await fetchOrThrow('/api/geofences', {
+        const response = await fetchOrThrow('api/geofences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newItem),
@@ -83,7 +95,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
         const item = await response.json();
         navigate(`/settings/geofence/${item.id}`);
       } catch (error) {
-        dispatch(errorsActions.push(error.message));
+        dispatch(messagesActions.push(error.message));
       }
     };
 
@@ -95,10 +107,10 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
     const listener = async (event) => {
       const feature = event.features[0];
       try {
-        await fetchOrThrow(`/api/geofences/${feature.id}`, { method: 'DELETE' });
+        await fetchOrThrow(`api/geofences/${feature.id}`, { method: 'DELETE' });
         refreshGeofences();
       } catch (error) {
-        dispatch(errorsActions.push(error.message));
+        dispatch(messagesActions.push(error.message));
       }
     };
 
@@ -113,14 +125,14 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
       if (item) {
         const updatedItem = { ...item, area: geometryToArea(feature.geometry) };
         try {
-          await fetchOrThrow(`/api/geofences/${feature.id}`, {
+          await fetchOrThrow(`api/geofences/${feature.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedItem),
           });
           refreshGeofences();
         } catch (error) {
-          dispatch(errorsActions.push(error.message));
+          dispatch(messagesActions.push(error.message));
         }
       }
     };
@@ -152,7 +164,18 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
     }
   }, [selectedGeofenceId, draw]);
 
-  return null;
+  return (
+    <Tooltip
+      open={Boolean(hintAnchor) && !hintDismissed && !selectedGeofenceId}
+      title={t('sharedGeofenceHint')}
+      placement={theme.direction === 'rtl' ? 'left' : 'right'}
+      arrow
+      disableInteractive
+      slotProps={{ popper: { anchorEl: hintAnchor } }}
+    >
+      <span />
+    </Tooltip>
+  );
 };
 
 export default MapGeofenceEdit;

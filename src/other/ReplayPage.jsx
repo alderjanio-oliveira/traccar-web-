@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import MapView from '../map/core/MapView';
 import MapRoutePath from '../map/MapRoutePath';
 import MapRoutePoints from '../map/MapRoutePoints';
-import MapPositions from '../map/MapPositions';
+import MapPositionMarkers from '../map/MapPositionMarkers';
 import { formatTime } from '../common/util/formatter';
 import ReportFilter from '../reports/components/ReportFilter';
 import { useTranslation } from '../common/components/LocalizationProvider';
@@ -152,7 +152,7 @@ const ReplayPage = () => {
       setSelectedDeviceId(deviceId);
       const query = new URLSearchParams({ deviceId, from, to });
       try {
-        const response = await fetchOrThrow(`/api/positions?${query.toString()}`);
+        const response = await fetchOrThrow(`api/positions?${query.toString()}`);
         setIndex(0);
         const positions = await response.json();
         setPositions(positions);
@@ -169,7 +169,7 @@ const ReplayPage = () => {
 
   const handleDownload = () => {
     const query = new URLSearchParams({ deviceId: selectedDeviceId, from, to });
-    window.location.assign(`/api/positions/kml?${query.toString()}`);
+    window.location.assign(`api/positions/kml?${query.toString()}`);
   };
 
   return (
@@ -180,7 +180,7 @@ const ReplayPage = () => {
         <MapRoutePath positions={positions} />
         <MapRoutePoints positions={positions} onClick={onPointClick} showSpeedControl />
         {index < positions.length && (
-          <MapPositions
+          <MapPositionMarkers
             positions={[positions[index]]}
             onMarkerClick={onMarkerClick}
             titleField="fixTime"

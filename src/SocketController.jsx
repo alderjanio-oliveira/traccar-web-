@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Snackbar } from '@mui/material';
-import { devicesActions, sessionActions } from './store';
+import { devicesActions, messagesActions, sessionActions } from './store';
 import { useCatchCallback, useAsyncTask } from './reactHelper';
 import { snackBarDurationLongMs } from './common/util/duration';
 import alarm from './resources/alarm.mp3';
@@ -14,6 +13,7 @@ import {
   nativePostMessage,
 } from './common/components/NativeInterface';
 import fetchOrThrow from './common/util/fetchOrThrow';
+import { reconnectDelay } from './common/util/liveUpdates';
 
 const logoutCode = 4000;
 
@@ -35,6 +35,7 @@ const SocketController = () => {
 
   const socketRef = useRef();
   const reconnectTimeoutRef = useRef();
+  const reconnectAttemptRef = useRef(0);
 
   const clearReconnectTimeout = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -42,8 +43,6 @@ const SocketController = () => {
       reconnectTimeoutRef.current = null;
     }
   }, []);
-
-  const [notifications, setNotifications] = useState([]);
 
   const soundEvents = useAttributePreference('soundEvents', '');
   const soundAlarms = useAttributePreference('soundAlarms', 'sos');
@@ -64,19 +63,26 @@ const SocketController = () => {
       ) {
         playAlarm();
       }
-      setNotifications(
-        events.map((event) => ({
-          id: event.id,
-          message: event.attributes.message,
-          show: true,
-        })),
-      );
+      events.forEach((event) => {
+        if (event.attributes.message) {
+          dispatch(
+            messagesActions.push({
+              message: event.attributes.message,
+              severity: 'info',
+              duration: snackBarDurationLongMs,
+            }),
+          );
+        }
+      });
     },
     [features, dispatch, soundEvents, soundAlarms],
   );
 
   const handleEventsRef = useRef(handleEvents);
   handleEventsRef.current = handleEvents;
+
+  const includeLogsRef = useRef(includeLogs);
+  includeLogsRef.current = includeLogs;
 
   const connectSocketRef = useRef();
 
@@ -85,27 +91,46 @@ const SocketController = () => {
     if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
       socketRef.current.close();
     }
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${window.location.host}/api/socket`);
+    const url = new URL('api/socket', document.baseURI);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(url);
     socketRef.current = socket;
 
     socket.onopen = () => {
+      if (socketRef.current !== socket) return;
+      reconnectAttemptRef.current = 0;
       dispatch(sessionActions.updateSocket(true));
+      socket.send(JSON.stringify({ logs: includeLogsRef.current }));
     };
 
     socket.onclose = async (event) => {
+      if (socketRef.current !== socket) return;
       dispatch(sessionActions.updateSocket(false));
       if (event.code === logoutCode) return;
+      if (socketRef.current !== socket) return;
+      clearReconnectTimeout();
+      const delay = reconnectDelay(reconnectAttemptRef.current);
+      reconnectAttemptRef.current = Math.min(reconnectAttemptRef.current + 1, 5);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connectSocketRef.current?.();
+      }, delay);
       try {
-        const devicesResponse = await fetch('/api/devices');
+        const devicesResponse = await fetch('api/devices', { signal: AbortSignal.timeout(10000) });
         if (socketRef.current !== socket) return;
         if (devicesResponse.ok) {
-          dispatch(devicesActions.update(await devicesResponse.json()));
+          const devices = await devicesResponse.json();
+          if (socketRef.current !== socket) return;
+          dispatch(devicesActions.update(devices));
         }
-        const positionsResponse = await fetch('/api/positions');
+        const positionsResponse = await fetch('api/positions', {
+          signal: AbortSignal.timeout(10000),
+        });
         if (socketRef.current !== socket) return;
         if (positionsResponse.ok) {
-          dispatch(sessionActions.updatePositions(await positionsResponse.json()));
+          const positions = await positionsResponse.json();
+          if (socketRef.current !== socket) return;
+          dispatch(sessionActions.updatePositions(positions));
         }
         if (devicesResponse.status === 401 || positionsResponse.status === 401) {
           navigate('/login');
@@ -113,15 +138,10 @@ const SocketController = () => {
       } catch {
         // ignore errors
       }
-      if (socketRef.current !== socket) return;
-      clearReconnectTimeout();
-      reconnectTimeoutRef.current = setTimeout(() => {
-        reconnectTimeoutRef.current = null;
-        connectSocketRef.current?.();
-      }, 60000);
     };
 
     socket.onmessage = (event) => {
+      if (socketRef.current !== socket) return;
       const data = JSON.parse(event.data);
       if (data.devices) {
         dispatch(devicesActions.update(data.devices));
@@ -141,19 +161,24 @@ const SocketController = () => {
   connectSocketRef.current = connectSocket;
 
   useEffect(() => {
-    socketRef.current?.send(JSON.stringify({ logs: includeLogs }));
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ logs: includeLogs }));
+    }
   }, [includeLogs]);
 
   useAsyncTask(
     async ({ signal }) => {
       if (authenticated) {
-        const response = await fetchOrThrow('/api/devices', { signal });
+        const response = await fetchOrThrow('api/devices', { signal });
         dispatch(devicesActions.refresh(await response.json()));
         nativePostMessage('authenticated');
         connectSocket();
         return () => {
           clearReconnectTimeout();
-          socketRef.current?.close(logoutCode);
+          const socket = socketRef.current;
+          socketRef.current = null;
+          socket?.close(logoutCode);
+          dispatch(sessionActions.updateSocket(false));
         };
       }
       return null;
@@ -165,7 +190,7 @@ const SocketController = () => {
     async (message) => {
       const eventId = message.data.eventId;
       if (eventId) {
-        const response = await fetch(`/api/events/${eventId}`);
+        const response = await fetch(`api/events/${eventId}`);
         if (response.ok) {
           const event = await response.json();
           const eventWithMessage = {
@@ -211,19 +236,7 @@ const SocketController = () => {
     };
   }, [authenticated, connectSocket]);
 
-  return (
-    <>
-      {notifications.map((notification) => (
-        <Snackbar
-          key={notification.id}
-          open={notification.show}
-          message={notification.message}
-          autoHideDuration={snackBarDurationLongMs}
-          onClose={() => setNotifications((prev) => prev.filter((e) => e.id !== notification.id))}
-        />
-      ))}
-    </>
-  );
+  return null;
 };
 
 export default SocketController;

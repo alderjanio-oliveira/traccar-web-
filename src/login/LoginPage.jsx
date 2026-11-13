@@ -7,13 +7,12 @@ import {
   Button,
   TextField,
   Link,
-  Snackbar,
+  Alert,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import CountryFlag from 'react-country-flag';
 import { makeStyles } from 'tss-react/mui';
-import CloseIcon from '@mui/icons-material/Close';
 import VpnLockIcon from '@mui/icons-material/VpnLock';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import { useTheme } from '@mui/material/styles';
@@ -31,7 +30,7 @@ import {
 } from '../common/components/NativeInterface';
 import LogoImage from './LogoImage';
 import { useCatch } from '../reactHelper';
-import QrCodeDialog from '../common/components/QrCodeDialog';
+import ServerQrCodeDialog from '../common/components/ServerQrCodeDialog';
 import PasswordField from '../common/components/PasswordField';
 
 const useStyles = makeStyles()((theme) => ({
@@ -84,6 +83,7 @@ const LoginPage = () => {
 
   const [email, setEmail] = usePersistedState('loginEmail', '');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [code, setCode] = useState('');
   const [showServerTooltip, setShowServerTooltip] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -104,12 +104,13 @@ const LoginPage = () => {
   const [announcementShown, setAnnouncementShown] = useState(false);
   const announcement = useSelector((state) => state.session.server.announcement);
 
-  const handlePasswordLogin = async (event) => {
+  const handlePasswordLogin = useCatch(async (event) => {
     event.preventDefault();
-    setFailed(false);
+    setSubmitting(true);
     try {
+      setFailed(false);
       const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-      const response = await fetch('/api/session', {
+      const response = await fetch('api/session', {
         method: 'POST',
         body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
       });
@@ -122,17 +123,18 @@ const LoginPage = () => {
         navigate(target, { replace: true });
       } else if (response.status === 401 && response.headers.get('WWW-Authenticate') === 'TOTP') {
         setCodeEnabled(true);
+      } else if (response.status === 401) {
+        setFailed(true);
       } else {
         throw Error(await response.text());
       }
-    } catch {
-      setFailed(true);
-      setPassword('');
+    } finally {
+      setSubmitting(false);
     }
-  };
+  });
 
   const handleTokenLogin = useCatch(async (token) => {
-    const response = await fetch(`/api/session?token=${encodeURIComponent(token)}`);
+    const response = await fetch(`api/session?token=${encodeURIComponent(token)}`);
     if (response.ok) {
       const user = await response.json();
       dispatch(sessionActions.updateUser(user));
@@ -146,7 +148,7 @@ const LoginPage = () => {
   handleTokenLoginRef.current = handleTokenLogin;
 
   const handleOpenIdLogin = () => {
-    document.location = '/api/session/openid/auth';
+    document.location = 'api/session/openid/auth';
   };
 
   useEffect(() => nativePostMessage('authentication'), []);
@@ -202,6 +204,11 @@ const LoginPage = () => {
         {useMediaQuery(theme.breakpoints.down('lg')) && (
           <LogoImage color={theme.palette.primary.main} />
         )}
+        {!!announcement && !announcementShown && (
+          <Alert severity="info" onClose={() => setAnnouncementShown(true)}>
+            {announcement}
+          </Alert>
+        )}
         {!openIdForced && (
           <>
             <TextField
@@ -241,14 +248,19 @@ const LoginPage = () => {
               type="submit"
               variant="contained"
               color="secondary"
-              disabled={!email || !password || (codeEnabled && !code)}
+              disabled={submitting || !email || !password || (codeEnabled && !code)}
             >
               {t('loginLogin')}
             </Button>
           </>
         )}
         {openIdEnabled && (
-          <Button onClick={() => handleOpenIdLogin()} variant="contained" color="secondary">
+          <Button
+            onClick={() => handleOpenIdLogin()}
+            variant="contained"
+            color="secondary"
+            disabled={submitting}
+          >
             {t('loginOpenId')}
           </Button>
         )}
@@ -277,16 +289,7 @@ const LoginPage = () => {
           </div>
         )}
       </div>
-      <QrCodeDialog open={showQr} onClose={() => setShowQr(false)} />
-      <Snackbar
-        open={!!announcement && !announcementShown}
-        message={announcement}
-        action={
-          <IconButton size="small" color="inherit" onClick={() => setAnnouncementShown(true)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        }
-      />
+      <ServerQrCodeDialog open={showQr} onClose={() => setShowQr(false)} />
     </LoginLayout>
   );
 };

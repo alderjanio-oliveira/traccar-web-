@@ -3,12 +3,12 @@ import dayjs from 'dayjs';
 import { Table, TableRow, TableCell, TableHead, TableBody } from '@mui/material';
 import { useAsyncTask, useScrollToLoad, pageSize } from '../reactHelper';
 import usePositionAttributes from '../common/attributes/usePositionAttributes';
-import { formatDistance, formatSpeed } from '../common/util/formatter';
-import { useAttributePreference } from '../common/util/preferences';
+import useAttributeUnits from '../common/util/useAttributeUnits';
+import { formatAttributeNumber, attributeUnitString } from '../common/util/attributeUnits';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import PageLayout from '../common/components/PageLayout';
 import SettingsMenu from './components/SettingsMenu';
-import CollectionFab from './components/CollectionFab';
+import AddFab from './components/AddFab';
 import CollectionActions from './components/CollectionActions';
 import TableShimmer from '../common/components/TableShimmer';
 import SearchHeader from './components/SearchHeader';
@@ -25,8 +25,7 @@ const MaintenacesPage = () => {
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [hasMore, setHasMore] = useState(true);
-  const speedUnit = useAttributePreference('speedUnit');
-  const distanceUnit = useAttributePreference('distanceUnit');
+  const units = useAttributeUnits();
 
   const loadItems = useCallback(
     async (offset, signal) => {
@@ -34,7 +33,7 @@ const MaintenacesPage = () => {
       if (searchKeyword) {
         query.append('keyword', searchKeyword);
       }
-      const response = await fetchOrThrow(`/api/maintenance?${query.toString()}`, { signal });
+      const response = await fetchOrThrow(`api/maintenance?${query.toString()}`, { signal });
       const data = await response.json();
       setItems((previous) => (offset ? [...previous, ...data] : data));
       setHasMore(data.length >= pageSize);
@@ -61,20 +60,9 @@ const MaintenacesPage = () => {
       }
       return `${value / 86400000} ${t('sharedDays')}`;
     }
-    if (attribute && attribute.dataType) {
-      switch (attribute.dataType) {
-        case 'speed':
-          return formatSpeed(value, speedUnit, t);
-        case 'distance':
-          return formatDistance(value, distanceUnit, t);
-        case 'hours':
-          return `${value / 3600000} ${t('sharedHours')}`;
-        default:
-          return value;
-      }
-    }
-
-    return value;
+    const formatted = formatAttributeNumber(value, attribute?.dataType, units);
+    const unit = attributeUnitString(attribute?.dataType, units, t);
+    return unit ? `${formatted} ${unit}` : formatted;
   };
 
   return (
@@ -112,7 +100,7 @@ const MaintenacesPage = () => {
           )}
         </TableBody>
       </Table>
-      <CollectionFab editPath="/settings/maintenance" />
+      <AddFab editPath="/settings/maintenance" />
     </PageLayout>
   );
 };

@@ -18,7 +18,7 @@ import { useTranslation } from '../common/components/LocalizationProvider';
 import MapGeocoder from '../map/control/MapGeocoder';
 import SelectField from '../common/components/SelectField';
 import { devicesActions } from '../store';
-import MapPositions from '../map/MapPositions';
+import MapPositionMarkers from '../map/MapPositionMarkers';
 import { useCatch } from '../reactHelper';
 import MapScale from '../map/MapScale';
 import BackIcon from '../common/components/BackIcon';
@@ -83,7 +83,7 @@ const EmulatorPage = () => {
         params.append('id', devices[deviceId].uniqueId);
         params.append('lat', latitude);
         params.append('lon', longitude);
-        await fetchOrThrow(window.location.origin, {
+        await fetchOrThrow(document.baseURI, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -95,7 +95,7 @@ const EmulatorPage = () => {
         params.append('id', devices[deviceId].uniqueId);
         params.append('lat', latitude);
         params.append('lon', longitude);
-        await fetchOrThrow(`http://${window.location.hostname}:5055?${params.toString()}`, {
+        await fetch(`http://${window.location.hostname}:5055?${params.toString()}`, {
           method: 'POST',
           mode: 'no-cors',
         });
@@ -135,7 +135,7 @@ const EmulatorPage = () => {
         </Drawer>
         <div className={classes.mapContainer}>
           <MapView>
-            <MapPositions
+            <MapPositionMarkers
               positions={Object.values(positions)}
               onMapClick={handleClick}
               showStatus

@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { shouldReplacePosition } from '../common/util/liveUpdates';
 
 const { reducer, actions } = createSlice({
   name: 'session',
@@ -38,11 +39,12 @@ const { reducer, actions } = createSlice({
         state.server.attributes['web.liveRouteLength'] ||
         10;
       action.payload.forEach((position) => {
+        if (!shouldReplacePosition(state.positions[position.deviceId], position)) return;
         state.positions[position.deviceId] = position;
         if (liveRoutes !== 'none') {
           const route = state.history[position.deviceId] || [];
           const last = route.at(-1);
-          if (!last || (last[0] !== position.longitude && last[1] !== position.latitude)) {
+          if (!last || last[0] !== position.longitude || last[1] !== position.latitude) {
             state.history[position.deviceId] = [
               ...route.slice(1 - liveRoutesLimit),
               [position.longitude, position.latitude],

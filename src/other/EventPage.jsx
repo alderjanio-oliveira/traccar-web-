@@ -7,7 +7,7 @@ import { useAsyncTask } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import MapView from '../map/core/MapView';
 import MapCamera from '../map/MapCamera';
-import MapPositions from '../map/MapPositions';
+import MapPositionMarkers from '../map/MapPositionMarkers';
 import MapGeofence from '../map/MapGeofence';
 import StatusCard from '../common/components/StatusCard';
 import { formatNotificationTitle } from '../common/util/formatter';
@@ -58,7 +58,7 @@ const EventPage = () => {
   useAsyncTask(
     async ({ signal }) => {
       if (id) {
-        const response = await fetchOrThrow(`/api/events/${id}`, { signal });
+        const response = await fetchOrThrow(`api/events/${id}`, { signal });
         setEvent(await response.json());
       }
     },
@@ -68,7 +68,7 @@ const EventPage = () => {
   useAsyncTask(
     async ({ signal }) => {
       if (event && event.positionId) {
-        const response = await fetchOrThrow(`/api/positions?id=${event.positionId}`, { signal });
+        const response = await fetchOrThrow(`api/positions?id=${event.positionId}`, { signal });
         const positions = await response.json();
         if (positions.length > 0) {
           setPosition(positions[0]);
@@ -92,7 +92,7 @@ const EventPage = () => {
         <MapView>
           <MapGeofence />
           {position && (
-            <MapPositions
+            <MapPositionMarkers
               positions={[position]}
               onMarkerClick={onMarkerClick}
               titleField="fixTime"

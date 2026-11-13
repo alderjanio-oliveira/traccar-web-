@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Button, TextField, Typography, Snackbar, IconButton } from '@mui/material';
+import { useDispatch } from 'react-redux';
+import { Button, TextField, Typography, IconButton } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoginLayout from './LoginLayout';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import { snackBarDurationShortMs } from '../common/util/duration';
+import { messagesActions } from '../store';
 import { useCatch } from '../reactHelper';
 import BackIcon from '../common/components/BackIcon';
 import PasswordField from '../common/components/PasswordField';
@@ -31,6 +32,7 @@ const useStyles = makeStyles()((theme) => ({
 const ResetPasswordPage = () => {
   const { classes } = useStyles();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const t = useTranslation();
 
   const [searchParams] = useSearchParams();
@@ -38,24 +40,35 @@ const ResetPasswordPage = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCatch(async (event) => {
     event.preventDefault();
-    if (!token) {
-      await fetchOrThrow('/api/password/reset', {
-        method: 'POST',
-        body: new URLSearchParams(`email=${encodeURIComponent(email)}`),
-      });
-    } else {
-      await fetchOrThrow('/api/password/update', {
-        method: 'POST',
-        body: new URLSearchParams(
-          `token=${encodeURIComponent(token)}&password=${encodeURIComponent(password)}`,
-        ),
-      });
+    setSubmitting(true);
+    try {
+      if (!token) {
+        await fetchOrThrow('api/password/reset', {
+          method: 'POST',
+          body: new URLSearchParams(`email=${encodeURIComponent(email)}`),
+        });
+      } else {
+        await fetchOrThrow('api/password/update', {
+          method: 'POST',
+          body: new URLSearchParams(
+            `token=${encodeURIComponent(token)}&password=${encodeURIComponent(password)}`,
+          ),
+        });
+      }
+      dispatch(
+        messagesActions.push({
+          message: t(!token ? 'loginResetSuccess' : 'loginUpdateSuccess'),
+          severity: 'success',
+        }),
+      );
+      navigate('/login');
+    } finally {
+      setSubmitting(false);
     }
-    setSnackbarOpen(true);
   });
 
   return (
@@ -85,7 +98,7 @@ const ResetPasswordPage = () => {
             label={t('userPassword')}
             name="password"
             value={password}
-            autoComplete="current-password"
+            autoComplete="new-password"
             onChange={(event) => setPassword(event.target.value)}
           />
         )}
@@ -94,18 +107,12 @@ const ResetPasswordPage = () => {
           color="secondary"
           type="submit"
           onClick={handleSubmit}
-          disabled={!/(.+)@(.+)\.(.{2,})/.test(email) && !password}
+          disabled={submitting || (!/(.+)@(.+)\.(.{2,})/.test(email) && !password)}
           fullWidth
         >
           {t('loginReset')}
         </Button>
       </div>
-      <Snackbar
-        open={snackbarOpen}
-        onClose={() => navigate('/login')}
-        autoHideDuration={snackBarDurationShortMs}
-        message={!token ? t('loginResetSuccess') : t('loginUpdateSuccess')}
-      />
     </LoginLayout>
   );
 };
