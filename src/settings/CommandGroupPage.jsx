@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -37,20 +37,40 @@ const CommandDevicePage = () => {
 
   const [item, setItem] = useState({ type: 'custom', attributes: {} });
 
+  const submissionRef = useRef(null);
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
+
   const handleSend = useCatch(async () => {
-    const query = new URLSearchParams({ groupId: id });
-    const response = await fetchOrThrow(`api/commands/send?${query.toString()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
-    });
-    dispatch(
-      messagesActions.push({
-        message: t(response.status === 202 ? 'commandQueued' : 'commandSent'),
-        severity: 'success',
-      }),
-    );
-    navigate(-1);
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      const query = new URLSearchParams({ groupId: id });
+      const payload = JSON.stringify(item);
+      const signature = `${id}:${payload}`;
+      if (submissionRef.current?.signature !== signature) {
+        submissionRef.current = { signature, key: crypto.randomUUID() };
+      }
+      await fetchOrThrow(`api/commands/send?${query.toString()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': submissionRef.current.key,
+        },
+        body: payload,
+      });
+      dispatch(
+        messagesActions.push({
+          message: t('commandSubmissionRecorded'),
+          severity: 'success',
+        }),
+      );
+      navigate(-1);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   });
 
   return (
@@ -96,6 +116,7 @@ const CommandDevicePage = () => {
             color="primary"
             variant="contained"
             onClick={handleSend}
+            disabled={sending || !item.attributes.data}
             disabled={!item.attributes.data}
           >
             {t('commandSend')}

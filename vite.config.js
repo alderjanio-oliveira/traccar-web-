@@ -28,8 +28,8 @@ export default defineConfig(() => ({
         globPatterns: ['**/*.{js,css,html,woff,woff2,mp3}'],
       },
       manifest: {
-        short_name: '${title}',
-        name: '${description}',
+        short_name: 'Mobgo Rastreamentos',
+        name: 'Mobgo Rastreamentos',
         theme_color: '${colorPrimary}',
         icons: [
           {

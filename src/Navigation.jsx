@@ -17,6 +17,10 @@ const UsersPage = lazy(() => import('./settings/UsersPage'));
 const DevicePage = lazy(() => import('./settings/DevicePage'));
 const UserPage = lazy(() => import('./settings/UserPage'));
 const NotificationsPage = lazy(() => import('./settings/NotificationsPage'));
+const BillingPage = lazy(() => import('./settings/BillingPage'));
+const OperationsPage = lazy(() => import('./settings/OperationsPage'));
+const CommandHistoryPage = lazy(() => import('./settings/CommandHistoryPage'));
+const NotificationDeliveriesPage = lazy(() => import('./settings/NotificationDeliveriesPage'));
 const NotificationPage = lazy(() => import('./settings/NotificationPage'));
 const GroupsPage = lazy(() => import('./settings/GroupsPage'));
 const GroupPage = lazy(() => import('./settings/GroupPage'));
@@ -172,6 +176,10 @@ const Navigation = () => {
             <Route path="maintenance/:id" element={<MaintenancePage />} />
             <Route path="maintenance" element={<MaintenancePage />} />
             <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="operations" element={<OperationsPage />} />
+            <Route path="command-history" element={<CommandHistoryPage />} />
+            <Route path="notification-deliveries" element={<NotificationDeliveriesPage />} />
             <Route path="notification/:id" element={<NotificationPage />} />
             <Route path="notification" element={<NotificationPage />} />
             <Route path="preferences" element={<PreferencesPage />} />

@@ -3,6 +3,12 @@ import { useMemo } from 'react';
 export default (t) =>
   useMemo(
     () => ({
+      'monitoring.enabled': { name: t('monitoringEnabled'), type: 'boolean' },
+      'monitoring.silenceMinutes': { name: t('monitoringSilence'), type: 'number' },
+      'monitoring.gpsMinutes': { name: t('monitoringGps'), type: 'number' },
+      'monitoring.ignitionMinutes': { name: t('monitoringIgnition'), type: 'number' },
+      'monitoring.recovery': { name: t('monitoringRecovery'), type: 'boolean' },
+      'monitoring.recoverySeconds': { name: t('monitoringRecoverySeconds'), type: 'number' },
       'command.sender': {
         name: t('deviceCommandSender'),
         type: 'string',

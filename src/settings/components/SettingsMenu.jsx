@@ -39,10 +39,28 @@ const SettingsMenu = () => {
     <>
       <List>
         <MenuItem
+          title={t('commandHistoryTitle')}
+          link="/settings/command-history"
+          icon={<SendIcon />}
+          selected={location.pathname === '/settings/command-history'}
+        />
+        <MenuItem
+          title={t('operationsTitle')}
+          link="/settings/operations"
+          icon={<RouterIcon />}
+          selected={location.pathname === '/settings/operations'}
+        />
+        <MenuItem
           title={t('sharedPreferences')}
           link="/settings/preferences"
           icon={<TuneIcon />}
           selected={location.pathname === '/settings/preferences'}
+        />
+        <MenuItem
+          title={t('notificationDeliveryTitle')}
+          link="/settings/notification-deliveries"
+          icon={<NotificationsIcon />}
+          selected={location.pathname === '/settings/notification-deliveries'}
         />
         {!readonly && (
           <>
@@ -50,7 +68,10 @@ const SettingsMenu = () => {
               title={t('sharedNotifications')}
               link="/settings/notifications"
               icon={<NotificationsIcon />}
-              selected={location.pathname.startsWith('/settings/notification')}
+              selected={
+                location.pathname.startsWith('/settings/notification') &&
+                location.pathname !== '/settings/notification-deliveries'
+              }
             />
             <MenuItem
               title={t('settingsUser')}
@@ -120,6 +141,12 @@ const SettingsMenu = () => {
             )}
           </>
         )}
+        <MenuItem
+          title={t('billingTitle')}
+          link="/settings/billing"
+          icon={<PaymentIcon />}
+          selected={location.pathname === '/settings/billing'}
+        />
         {billingLink && (
           <MenuItem title={t('userBilling')} link={billingLink} icon={<PaymentIcon />} />
         )}
@@ -129,6 +156,18 @@ const SettingsMenu = () => {
       </List>
       <Divider />
       <List>
+        <MenuItem
+          title={t('commandHistoryTitle')}
+          link="/settings/command-history"
+          icon={<SendIcon />}
+          selected={location.pathname === '/settings/command-history'}
+        />
+        <MenuItem
+          title={t('operationsTitle')}
+          link="/settings/operations"
+          icon={<RouterIcon />}
+          selected={location.pathname === '/settings/operations'}
+        />
         <MenuItem
           title={t('settingsProtocols')}
           link="/settings/protocols"

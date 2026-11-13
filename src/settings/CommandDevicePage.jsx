@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -30,29 +30,44 @@ const CommandDevicePage = () => {
   const [savedId, setSavedId] = useState(0);
   const [item, setItem] = useState({});
 
+  const submissionRef = useRef(null);
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
+
   const handleSend = useCatch(async () => {
-    let command;
-    if (savedId) {
-      const response = await fetchOrThrow(`api/commands/${savedId}`);
-      command = await response.json();
-    } else {
-      command = item;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      let command;
+      if (savedId) {
+        const response = await fetchOrThrow(`api/commands/${savedId}`);
+        command = await response.json();
+      } else {
+        command = { ...item };
+      }
+      command.deviceId = parseInt(id, 10);
+      const payload = JSON.stringify(command);
+      const signature = `${id}:${payload}`;
+      if (submissionRef.current?.signature !== signature) {
+        submissionRef.current = { signature, key: crypto.randomUUID() };
+      }
+      await fetchOrThrow('api/commands/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': submissionRef.current.key,
+        },
+        body: payload,
+      });
+      dispatch(
+        messagesActions.push({ message: t('commandSubmissionRecorded'), severity: 'success' }),
+      );
+      navigate(-1);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
-
-    command.deviceId = parseInt(id, 10);
-
-    const response = await fetchOrThrow('api/commands/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(command),
-    });
-    dispatch(
-      messagesActions.push({
-        message: t(response.status === 202 ? 'commandQueued' : 'commandSent'),
-        severity: 'success',
-      }),
-    );
-    navigate(-1);
   });
 
   const validate = () => savedId || (item && item.type);
@@ -84,7 +99,7 @@ const CommandDevicePage = () => {
             color="primary"
             variant="contained"
             onClick={handleSend}
-            disabled={!validate()}
+            disabled={sending || !validate()}
           >
             {t('commandSend')}
           </Button>

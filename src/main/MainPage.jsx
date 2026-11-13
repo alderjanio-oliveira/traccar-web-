@@ -5,6 +5,7 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDispatch, useSelector } from 'react-redux';
 import DeviceList from './DeviceList';
+import BillingBanner from './BillingBanner';
 import BottomMenu from '../common/components/BottomMenu';
 import StatusCard from '../common/components/StatusCard';
 import { devicesActions } from '../store';
@@ -129,6 +130,7 @@ const MainPage = () => {
       <div className={classes.sidebar}>
         {!features.disableDeviceList && (
           <Paper square elevation={3} className={classes.header}>
+            <BillingBanner />
             <MainToolbar
               filteredDevices={filteredDevices}
               devicesOpen={devicesOpen}
